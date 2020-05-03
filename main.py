@@ -163,6 +163,40 @@ async def update_customer_info(
     return data
 
 
+@app.get("/sales")
+async def sales_stats(response: Response, category: str):
+    if category == "customers":
+        app.db_connection.row_factory = sqlite3.Row
+        data = app.db_connection.execute(
+                f"""SELECT customers.customerid
+                    ,customers.email
+                    ,customers.phone
+                    ,ROUND(SUM(invoices.total), 2) as Sum
+                    FROM customers
+                    JOIN invoices ON customers.customerid = invoices.customerid
+                    GROUP BY invoices.customerid
+                    ORDER BY Sum DESC, invoices.customerid"""
+            ).fetchall()
+        return data
+    elif category == "genres":
+        app.db_connection.row_factory = sqlite3.Row
+        data = app.db_connection.execute(
+                f"""SELECT genres.name as Name
+                    ,SUM(invoice_items.quantity) as Sum
+                    FROM genres
+                    JOIN tracks ON tracks.genreid = genres.genreid
+                    JOIN invoice_items ON invoice_items.trackid = tracks.trackid
+                    GROUP BY genres.name
+                    ORDER BY Sum DESC, Name"""
+            ).fetchall()
+        return data
+    else:
+        response.status_code = status.HTTP_404_NOT_FOUND
+        return {"detail":
+                {"error": "Can't present statistics for this category."}
+                }
+
+
 @app.get("/welcome")
 @is_logged_in
 def welcome(request: Request, session_token: str = Cookie(None)):
